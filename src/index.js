@@ -5,7 +5,7 @@ import morgan from "morgan";
 import mongoose from "mongoose";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import cookieSession from "cookie-session"
+import cookieSession from "cookie-session";
 import routerCategory from "./routes/category";
 import userRouter from "./routes/users";
 import movieTypeRoute from "./routes/movieType";
@@ -20,24 +20,21 @@ import foodDetailRoute from "./routes/foodDetail";
 import ticketDetailRoute from "./routes/ticketDetail";
 import routerTicket from "./routes/ticket";
 import orderRoute from "./routes/order";
-import cloudinary from "cloudinary"
-import multer from "multer"
-import streamifier from "streamifier"
+import cloudinary from "cloudinary";
+import multer from "multer";
+import streamifier from "streamifier";
 import routerShowTime from "./routes/showTime";
-import User from "./models/users"
+import User from "./models/users";
 import routerWebConfig from "./routes/webConfig";
 import swaggerUI from "swagger-ui-express";
 import YAML from "yamljs";
 import routerSetByShowTime from "./routes/setByShowTime";
-import sliderRoute from "./routes/slider"
-import postRoute from "./routes/post"
-import voucherRoute from "./routes/voucher"
+import sliderRoute from "./routes/slider";
+import postRoute from "./routes/post";
+import voucherRoute from "./routes/voucher";
 import routerComment from "./routes/comment";
 import jwt from "jsonwebtoken";
 import path from "path";
-
-
-
 
 dotenv.config({ path: __dirname + "/configs/settings.env" });
 cloudinary.v2.config({
@@ -52,67 +49,101 @@ app.use(morgan("tiny"));
 app.use(express.json({ limit: "50mb" }));
 
 const corsOptions = {
-  origin: "*",
-  credentials: true, //access-control-allow-credentials:true
-  optionSuccessStatus: 200,
+  origin: "http://localhost:5173", // Chỉ định rõ domain của frontend
+  credentials: true, // Cho phép gửi cookies/session
 };
 app.use(cors(corsOptions));
 
 app.use(
   cookieSession({
     maxAge: 30 * 24 * 60 * 60 * 1000,
-    keys: [process.env.COOKIE_KEY]
+    keys: [process.env.COOKIE_KEY],
   })
 );
 app.use(passport.initialize());
 app.use(passport.session());
-app.use('/docs', express.static(path.join(__dirname, 'docs')));
+app.use("/docs", express.static(path.join(__dirname, "docs")));
 
 passport.serializeUser((user, done) => {
-  done(null, user._id)
-})
+  done(null, user._id);
+});
 
 passport.deserializeUser((id, done) => {
-  User.findById({ _id: id }).then(user => done(null, user))
-})
+  User.findById({ _id: id }).then((user) => done(null, user));
+});
 
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: "https://cinema-manager-vol3.vercel.app/auth/google/callback",
-  passReqToCallback: true
-},
-  function (request, accessToken, refreshToken, profile, done) {
-    if (profile.id) {
-      User.findOne({ email: profile.emails[0].value }).then((existUser) => {
-        if (existUser) {
-          User.findOneAndUpdate({ _id: existUser._id }, { status: 1, googleId: profile.id, avatar: [profile.photos[0].value] }, { new: true }).then(user => done(null, user));
-        } else {
-          new User({
-            googleId: profile.id,
-            email: profile.emails[0].value,
-            fullname: profile.name.familyName + ' ' + profile.name.givenName,
-            password: "no-password",
-            avatar: [profile.photos[0].value],
-            status: 1
-          }).save().then(user => done(null, user));
-        }
-      })
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL:
+        "https://cinema-manager-vol3.vercel.app/auth/google/callback",
+      passReqToCallback: true,
+    },
+    function (request, accessToken, refreshToken, profile, done) {
+      if (profile.id) {
+        User.findOne({ email: profile.emails[0].value }).then((existUser) => {
+          if (existUser) {
+            User.findOneAndUpdate(
+              { _id: existUser._id },
+              {
+                status: 1,
+                googleId: profile.id,
+                avatar: [profile.photos[0].value],
+              },
+              { new: true }
+            ).then((user) => done(null, user));
+          } else {
+            new User({
+              googleId: profile.id,
+              email: profile.emails[0].value,
+              fullname: profile.name.familyName + " " + profile.name.givenName,
+              password: "no-password",
+              avatar: [profile.photos[0].value],
+              status: 1,
+            })
+              .save()
+              .then((user) => done(null, user));
+          }
+        });
+      }
     }
-  }
-));
-app.get("/api/auth/google", passport.authenticate("google", {
-  scope: ["email", "profile"]
-}));
-app.get("/auth/google/callback",
+  )
+);
+app.get(
+  "/api/auth/google",
+  passport.authenticate("google", {
+    scope: ["email", "profile"],
+  })
+);
+app.get(
+  "/auth/google/callback",
   passport.authenticate("google"),
   (req, res) => {
     res.redirect(`${process.env.CLIENT_URL_ONLINE}/loading`);
   }
 );
 
-app.get('/api/current_user', (req, res) => {
-  const accessToken = jwt.sign(req.user.toJSON(), process.env.ACCESS_TOKEN_SECRET);
+app.get("/api/current_user", (req, res) => {
+  console.log("🚀 ~ app.get ~ req.user:", req.user)
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Kiểm tra ACCESS_TOKEN_SECRET trước khi tạo token
+  if (!process.env.ACCESS_TOKEN_SECRET) {
+    return res
+      .status(500)
+      .json({ message: "Server error: Missing secret key." });
+  }
+
+  // Tạo access token
+  const accessToken = jwt.sign(
+    req.user.toJSON(),
+    process.env.ACCESS_TOKEN_SECRET
+  );
+
   res.status(200).json({ user: req.user, accessToken });
 });
 
@@ -134,44 +165,45 @@ app.use("/api", orderRoute);
 app.use("/api", routerShowTime);
 app.use("/api", routerWebConfig);
 app.use("/api", routerSetByShowTime);
-app.use("/api", sliderRoute)
-app.use("/api", postRoute)
-app.use("/api", voucherRoute)
+app.use("/api", sliderRoute);
+app.use("/api", postRoute);
+app.use("/api", voucherRoute);
 app.use("/api", routerComment);
 
-app.post("/api/upload/images", fileUpload.array("images", 8), function (req, res, next) {
-  let streamUpload = (file) => {
-    return new Promise((resolve, reject) => {
-      let stream = cloudinary.v2.uploader.upload_stream(
-        (error, result) => {
+app.post(
+  "/api/upload/images",
+  fileUpload.array("images", 8),
+  function (req, res, next) {
+    let streamUpload = (file) => {
+      return new Promise((resolve, reject) => {
+        let stream = cloudinary.v2.uploader.upload_stream((error, result) => {
           if (result) {
-            resolve(result.secure_url)
+            resolve(result.secure_url);
           } else {
-            reject(error)
+            reject(error);
           }
+        });
+        streamifier.createReadStream(file.buffer).pipe(stream);
+      });
+    };
+    async function upload(req) {
+      try {
+        const urls = [];
+        const files = req.files;
+        for (const file of files) {
+          let result = await streamUpload(file);
+          urls.push(result);
         }
-      )
-      streamifier.createReadStream(file.buffer).pipe(stream);
-    });
-
-  };
-  async function upload(req) {
-    try {
-      const urls = [];
-      const files = req.files;
-      for (const file of files) {
-        let result = await streamUpload(file);
-        urls.push(result);
+        res.status(200).json(urls);
+      } catch (error) {
+        console.log(error);
       }
-      res.status(200).json(urls);
-    } catch (error) {
-      console.log(error)
     }
+    upload(req);
   }
-  upload(req);
-});
-const swaggerJSDocs = YAML.load(__dirname + "/configs/api.yaml")
-app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerJSDocs))
+);
+const swaggerJSDocs = YAML.load(__dirname + "/configs/api.yaml");
+app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerJSDocs));
 
 mongoose
   .connect(process.env.MONGODB_LOCAL)

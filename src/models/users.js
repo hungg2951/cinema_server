@@ -22,7 +22,8 @@ const userSchema = mongoose.Schema({
     minLength: 5,
   },
   avatar: {
-    type: Array
+    type: Array,
+    default:["https://cdn.kona-blue.com/upload/kona-blue_com/post/images/2024/09/18/457/avatar-mac-dinh-9.jpg"]
   },
   phone: {
     type: String,
